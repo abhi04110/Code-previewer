@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Previewer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Inter font and overall layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            overflow: hidden; /* Prevent body scroll when fullscreen */
+        }
+        .container {
+            display: flex;
+            flex-grow: 1;
+            flex-direction: column; /* Stack vertically on small screens */
+            padding: 1rem;
+            gap: 1rem;
+            transition: all 0.3s ease-in-out; /* Smooth transition for layout changes */
+        }
+        @media (min-width: 768px) { /* On medium screens and up, use row layout */
+            .container {
+                flex-direction: row;
+            }
+        }
+        textarea {
+            resize: vertical; /* Allow vertical resizing */
+            min-height: 200px; /* Minimum height for textarea */
+            font-family: monospace; /* Monospace font for code */
+        }
+        iframe {
+            border: 1px solid #cbd5e1; /* Light gray border for iframe */
+            background-color: #ffffff;
+            width: 100%;
+            height: 100%; /* Take full height of its container */
+            min-height: 300px; /* Minimum height for iframe */
+            transition: all 0.3s ease-in-out; /* Smooth transition for iframe size */
+        }
+        /* Style for the full screen button icon */
+        .fullscreen-icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            fill: currentColor;
+            margin-right: 0.5em;
+        }
+        /* Style for the message box */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .message-box.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* CSS for 'fullscreen-mode' */
+        body.fullscreen-mode .main-header,
+        body.fullscreen-mode .main-footer,
+        body.fullscreen-mode .code-input-section {
+            display: none; /* Hide header, footer, and code input */
+        }
+
+        body.fullscreen-mode .container {
+            padding: 0; /* Remove padding */
+            margin: 0; /* Remove margin */
+            flex-direction: column; /* Ensure vertical stacking for full view */
+            width: 100vw; /* Take full viewport width */
+            height: 100vh; /* Take full viewport height */
+            gap: 0; /* No gap in fullscreen */
+        }
+
+        body.fullscreen-mode .live-preview-section {
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            padding: 0; /* Remove padding */
+            margin: 0; /* Remove margin */
+            border-radius: 0; /* No rounded corners in fullscreen */
+            box-shadow: none; /* No shadow in fullscreen */
+        }
+
+        body.fullscreen-mode iframe {
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            border-radius: 0; /* No rounded corners in fullscreen */
+        }
+        body.fullscreen-mode #fullscreenButton {
+            position: fixed; /* Keep button visible */
+            top: 1rem;
+            right: 1rem;
+            z-index: 1001; /* Above iframe */
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #333;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md main-header">
+        <h1 class="text-3xl font-bold text-center">Live Code Previewer</h1>
+    </header>
+
+    <main class="container">
+        <!-- Code Input Section -->
+        <div class="flex flex-col w-full md:w-1/2 p-4 bg-white rounded-lg shadow-md code-input-section">
+            <label for="codeInput" class="text-lg font-semibold mb-2">Enter your HTML, CSS, or JavaScript here:</label>
+            <textarea
+                id="codeInput"
+                class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out"
+                placeholder="<!-- Your HTML, CSS, or JavaScript code goes here -->
+<div class='text-center p-4 text-xl font-bold text-blue-700'>
+    Hello from the preview!
+</div>
+<script>
+    console.log('This script runs in the preview iframe!');
+</script>"
+            ></textarea>
+            <button
+                id="previewButton"
+                class="mt-4 px-6 py-3 bg-blue-500 text-white font-bold rounded-lg shadow-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-300 ease-in-out transform hover:scale-105"
+            >
+                Preview Code
+            </button>
+        </div>
+
+        <!-- Live Preview Section -->
+        <div class="flex flex-col w-full md:w-1/2 p-4 bg-white rounded-lg shadow-md live-preview-section">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-lg font-semibold">Live Preview:</h2>
+                <button
+                    id="fullscreenButton"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition duration-200 ease-in-out"
+                    title="Toggle Full Screen"
+                >
+                    <svg class="fullscreen-icon" viewBox="0 0 24 24">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                    <span id="fullscreenButtonText">Full Screen</span>
+                </button>
+            </div>
+            <iframe id="previewFrame" class="flex-grow rounded-md" allowfullscreen="true"></iframe>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white text-center p-4 mt-auto shadow-inner main-footer">
+        <p>&copy; 2025 Code Previewer. All rights reserved.</p>
+    </footer>
+
+    <!-- Message box for user feedback -->
+    <div id="messageBox" class="message-box"></div>
+
+    <script>
+        // Get references to the DOM elements
+        const codeInput = document.getElementById('codeInput');
+        const previewButton = document.getElementById('previewButton');
+        const previewFrame = document.getElementById('previewFrame');
+        const fullscreenButton = document.getElementById('fullscreenButton');
+        const fullscreenButtonText = document.getElementById('fullscreenButtonText');
+        const messageBox = document.getElementById('messageBox');
+        const body = document.body;
+
+        // Function to display messages to the user
+        function showMessage(message, duration = 3000) {
+            messageBox.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // Function to update the iframe content
+        function updatePreview() {
+            const code = codeInput.value;
+            const iframeDoc = previewFrame.contentWindow.document;
+
+            // Clear previous content
+            iframeDoc.open();
+            iframeDoc.write('');
+            iframeDoc.close();
+
+            // Write the new code. This allows HTML, CSS (in style tags), and JS (in script tags)
+            iframeDoc.open();
+            iframeDoc.write(code);
+            iframeDoc.close();
+        }
+
+        // Function to toggle CSS-based "full screen" for the iframe
+        function toggleCssFullScreen() {
+            if (body.classList.contains('fullscreen-mode')) {
+                // Exit fullscreen mode
+                body.classList.remove('fullscreen-mode');
+                fullscreenButtonText.textContent = 'Full Screen';
+                showMessage('Exited full screen mode.');
+            } else {
+                // Enter fullscreen mode
+                body.classList.add('fullscreen-mode');
+                fullscreenButtonText.textContent = 'Exit Full Screen';
+                showMessage('Entered full screen mode. Press ESC or click "Exit Full Screen" to return.');
+            }
+        }
+
+        // Add event listeners
+        previewButton.addEventListener('click', updatePreview);
+        fullscreenButton.addEventListener('click', toggleCssFullScreen);
+
+        // Optional: Update preview on initial load with placeholder content
+        window.onload = () => {
+            updatePreview();
+        };
+
+        // Optional: Add a debounce for input changes for a smoother live preview experience
+        let timeout = null;
+        codeInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(updatePreview, 500); // Update after 500ms of no typing
+        });
+
+        // Listen for 'Escape' key to exit fullscreen mode
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && body.classList.contains('fullscreen-mode')) {
+                toggleCssFullScreen();
+            }
+        });
+    </script>
+</body>
+</html>
